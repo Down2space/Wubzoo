@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wubzoo hum synth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: loud, playful, club gear — a toy kazoo bolted into a bass rig
+   IDEA: a groovebox screen: your hum drawn as a pitch line, the wub drawn under it
+   PICTURE: the big piano-roll canvas with hum curve, output notes and the wobble LFO strip
+   COLOUR and TYPE: charcoal / bone ground, kazoo orange lead, warning yellow support; Rubik Mono One + Rubik
+   LAYOUT: title, stage canvas + transport, three control racks, export row */
+:root{color-scheme:light dark;--bg:light-dark(#f3efe6,#121317);--panel:light-dark(#fffaf0,#1b1d23);--ink:light-dark(#16171b,#f2efe8);--mute:light-dark(#5d5a55,#a8a49c);--line:light-dark(#ddd5c6,#2c2f37);--acc:#ff5a1f;--sup:light-dark(#c98f00,#ffd23f);--screen:#0e0f12;--grid:#1d2027;--key:#171a20}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Rubik,system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(20px,3.5vw,48px) max(5vw,16px);max-width:1240px;margin:0 auto}
+h1{font:400 clamp(32px,6vw,52px)/1.05 "Rubik Mono One",Rubik,sans-serif;margin:0;letter-spacing:-.02em}
+h1 span{color:var(--acc)}
+.lede{margin:.4em 0 0;color:var(--mute);max-width:60ch}
+.stage{background:var(--screen);border-radius:18px;padding:12px;box-shadow:0 18px 40px -24px #000a}
+.fig{position:relative;height:clamp(260px,42vw,420px);border-radius:10px;overflow:hidden}
+.fig>canvas{position:absolute;inset:0;width:100%;height:100%}
+.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:#cfcac0;padding:24px;font-size:17px}
+.empty[hidden]{display:none}
+.empty b{display:block;font:400 22px/1.2 "Rubik Mono One",sans-serif;color:var(--acc);margin-bottom:6px}
+.transport{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+button,.btn{font:500 16px Rubik,sans-serif;min-height:44px;padding:0 16px;border-radius:12px;border:1px solid #3a3d46;background:#23262e;color:#f2efe8;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+button:hover,.btn:hover{background:#2d3039}
+button:focus-visible,.btn:focus-within,select:focus-visible,input:focus-visible{outline:3px solid var(--sup);outline-offset:2px}
+button:disabled{opacity:.4;cursor:not-allowed}
+.hot{background:var(--acc);border-color:var(--acc);color:#140800;font-weight:700}
+.hot:hover{background:#ff7340}
+.rec.on{background:#e0262b;border-color:#e0262b}
+.btn input{position:absolute;width:1px;height:1px;opacity:0}
+.loop{color:#cfcac0;display:inline-flex;gap:6px;align-items:center;min-height:44px;padding:0 6px}
+.loop input{width:20px;height:20px;accent-color:var(--acc)}
+.status{color:#a8a49c;font-size:14px;margin:8px 2px 0;min-height:1.4em}
+.racks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.rack{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.rack h2{font:400 15px "Rubik Mono One",sans-serif;margin:0 0 10px;color:var(--acc)}
+label.f{display:grid;grid-template-columns:7.5em minmax(0,1fr) 3.2em;align-items:center;gap:8px;min-height:44px;font-size:15px}
+label.f output{text-align:right;font-variant-numeric:tabular-nums;color:var(--mute);font-size:14px}
+label.s{display:grid;grid-template-columns:7.5em minmax(0,1fr);align-items:center;gap:8px;min-height:44px;font-size:15px}
+select,input[type=number]{font:16px Rubik,sans-serif;min-height:40px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:0 8px;width:100%}
+input[type=range]{width:100%;accent-color:var(--acc);height:28px}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.seg button{background:var(--bg);color:var(--ink);border-color:var(--line);font-size:14px;padding:0 12px}
+.seg button[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#140800;font-weight:700}
+.note{font-size:13px;color:var(--mute);margin:6px 0 0}
+.presets{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.presets button,.exp button{background:var(--panel);color:var(--ink);border-color:var(--line)}
+.exp{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.exp p{margin:0;color:var(--mute);font-size:14px;flex:1 1 260px}
+.tips{color:var(--mute);font-size:14px;margin:0}
+@media(max-width:900px){.racks{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.transport button,.transport .btn{flex:1 1 40%;justify-content:center}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="band" style="padding-bottom:12px">
+  <h1>Wub<span>zoo</span></h1>
+  <p class="lede">Hum a melody, and it plays back as a growling, wobbling dubstep kazoo. Record, tweak, then save it as audio or MIDI.</p>
+</header>
+
+<main class="band" style="padding-top:0">
+  <section class="stage">
+    <div class="fig" id="fig"><canvas id="cv"></canvas>
+      <div class="empty" id="empty"><div><b>Hum something</b>Record your hum, upload a voice memo, or try the demo hum.</div></div>
+    </div>
+    <div class="transport">
+      <button class="rec" id="rec">● Record</button>
+      <label class="btn" id="uplab">⇪ Upload hum<input type="file" id="file" accept="audio/*"></label>
+      <button id="demo">Demo hum</button>
+      <button id="playHum" disabled>▶ My hum</button>
+      <button class="hot" id="playWub" disabled>▶ Wubzoo</button>
+      <label class="loop"><input type="checkbox" id="loop"> Loop</label>
+    </div>
+    <p class="status" id="status" aria-live="polite"></p>
+  </section>
+
+  <div class="racks" style="margin-top:18px">
+    <section class="rack">
+      <h2>Pitch</h2>
+      <div class="seg" id="mode" role="group" aria-label="Pitch mode">
+        <button data-v="follow" aria-pressed="false">Follow hum</button>
+        <button data-v="snap" aria-pressed="true">Snap to key</button>
+        <button data-v="notes" aria-pressed="false">Notes</button>
+      </div>
+      <label class="s">Key <select id="key"></select></label>
+      <label class="s">Scale <select id="scale"></select></label>
+      <label class="s">Quantize <select id="quant"><option value="0">Off</option><option value="8">1/8 notes</option><option value="16" selected>1/16 notes</option></select></label>
+      <label class="s">Octave <select id="oct"><option value="-24">−2</option><option value="-12">−1</option><option value="0" selected>0</option><option value="12">+1</option></select></label>
+      <p class="note" id="modeNote"></p>
+    </section>
+    <section class="rack">
+      <h2>Wobble</h2>
+      <label class="s">Tempo <input type="number" id="bpm" min="60" max="200" value="140"></label>
+      <label class="s">Rate <select id="rate"><option value="2">1/2</option><option value="1">1/4</option><option value="0.6667">1/4 triplet</option><option value="0.5" selected>1/8</option><option value="0.3333">1/8 triplet</option><option value="0.25">1/16</option></select></label>
+      <label class="f">Depth <input type="range" id="depth" min="0" max="100" value="80"><output></output></label>
+      <label class="f">Resonance <input type="range" id="reso" min="0" max="100" value="55"><output></output></label>
+    </section>
+    <section class="rack">
+      <h2>Tone</h2>
+      <label class="f">Growl <input type="range" id="growl" min="0" max="100" value="55"><output></output></label>
+      <label class="f">Distortion <input type="range" id="drive" min="0" max="100" value="45"><output></output></label>
+      <label class="f">Kazoo buzz <input type="range" id="buzz" min="0" max="100" value="65"><output></output></label>
+      <div class="presets" id="presets">
+        <button data-p="wub">Classic wub</button>
+        <button data-p="filth">Filthy growl</button>
+        <button data-p="kazoo">Clean kazoo</button>
+        <button data-p="yoi">Wonky yoi</button>
+      </div>
+    </section>
+  </div>
+
+  <section class="rack exp" style="margin-top:14px">
+    <button id="saveWav" disabled>⤓ Save WAV</button>
+    <button id="saveMid" disabled>⤓ Save MIDI</button>
+    <p>WAV drops straight onto a Pro Tools audio track. MIDI uses the Notes detection with your key and quantize settings, for any synth.</p>
+  </section>
+  <p class="tips" style="margin-top:14px">Tips: hum close to the mic with headphones on, use clear "doo-doo" or "mmm" notes, and keep takes under a minute.</p>
+</main>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const SCALES={'Minor':[0,2,3,5,7,8,10],'Phrygian (dark)':[0,1,3,5,7,8,10],'Harmonic minor':[0,2,3,5,7,8,11],'Minor pentatonic':[0,3,5,7,10],'Major':[0,2,4,5,7,9,11],'Chromatic':[0,1,2,3,4,5,6,7,8,9,10,11]};
+$('key').innerHTML=NOTES.map((n,i)=>`<option value="${i}"${i===5?' selected':''}>${n}</option>`).join('');
+$('scale').innerHTML=Object.keys(SCALES).map(s=>`<option>${s}</option>`).join('');
+const SR=44100, AR=11025, HOP=64, WIN=512, TMIN=11, TMAX=170, FT=HOP/AR;
+let actx=null, hum=null, an=null, out=null, notes=[], src=null, playing=null, t0=0, raf=0, recState=null, dl=null;
+const st=m=>$('status').textContent=m;
+const ctx=()=>actx||(actx=new (window.AudioContext||window.webkitAudioContext)());
+
+/* ---------- analysis: YIN pitch tracking ---------- */
+function analyze(x){
+  const a=Math.exp(-2*Math.PI*3000/SR);let y1=0,y2=0;const lp=new Float32Array(x.length);
+  for(let i=0;i<x.length;i++){y1=(1-a)*x[i]+a*y1;y2=(1-a)*y1+a*y2;lp[i]=y2}
+  const n=Math.floor(x.length*AR/SR),r=new Float32Array(n),k=SR/AR;
+  for(let i=0;i<n;i++){const p=i*k,j=p|0,f=p-j;r[i]=lp[j]*(1-f)+(lp[j+1]||0)*f}
+  const F=Math.max(0,Math.floor((n-WIN-TMAX)/HOP)),midi=new Float32Array(F),rms=new Float32Array(F),v=new Uint8Array(F),d=new Float32Array(TMAX+2);
+  let maxR=0;
+  for(let fi=0;fi<F;fi++){
+    const s=fi*HOP;let e=0;for(let j=0;j<WIN;j++)e+=r[s+j]*r[s+j];rms[fi]=Math.sqrt(e/WIN);if(rms[fi]>maxR)maxR=rms[fi];
+    let sum=0;d[0]=1;
+    for(let t=1;t<=TMAX+1;t++){let q=0;for(let j=0;j<WIN;j++){const z=r[s+j]-r[s+j+t];q+=z*z}sum+=q;d[t]=sum>0?q*t/sum:1}
+    let tau=-1;
+    for(let t=TMIN;t<=TMAX;t++){if(d[t]<0.15){while(t<TMAX&&d[t+1]<d[t])t++;tau=t;break}}
+    if(tau<0){let b=TMIN;for(let t=TMIN;t<=TMAX;t++)if(d[t]<d[b])b=t;if(d[b]<0.32)tau=b}
+    if(tau>0){const a0=d[tau-1],a1=d[tau],a2=d[tau+1],den=a0-2*a1+a2;const tt=den?tau+(a0-a2)/(2*den):tau;midi[fi]=69+12*Math.log2(AR/tt/440);v[fi]=1}
+  }
+  const gate=Math.max(maxR*0.07,0.003);
+  for(let i=0;i<F;i++)if(rms[i]<gate)v[i]=0;
+  const m2=midi.slice();
+  for(let i=0;i<F;i++)if(v[i]){const w=[];for(let j=i-3;j<=i+3;j++)if(j>=0&&j<F&&v[j])w.push(midi[j]);w.sort((p,q)=>p-q);m2[i]=w[w.length>>1]}
+  runs(v,1,8,0);runs(v,0,6,1,m2);
+  const amp=new Float32Array(F);
+  for(let i=0;i<F;i++)amp[i]=v[i]?Math.min(1,Math.pow(rms[i]/maxR*1.5,0.7)):0;
+  return {midi:m2,amp,v,F};
+}
+function runs(v,val,minLen,setTo,m){ // remove short runs of `val` (bounded on both sides for gaps)
+  const F=v.length;let i=0;
+  while(i<F){if(v[i]!==val){i++;continue}let j=i;while(j<F&&v[j]===val)j++;
+    const inner=val===1||(i>0&&j<F);
+    if(j-i<minLen&&inner){for(let q=i;q<j;q++){v[q]=setTo;if(m){const f=(q-i+1)/(j-i+1);m[q]=m[i-1]*(1-f)+m[j]*f}}}
+    i=j}
+}
+const scaleSet=()=>{const k=+$('key').value,s=SCALES[$('scale').value];return new Set(s.map(x=>(x+k)%12))};
+function snap(m,set){const r=Math.round(m);let best=r,bd=1e9;for(let c=r-2;c<=r+2;c++)if(set.has(((c%12)+12)%12)&&Math.abs(c-m)<bd){bd=Math.abs(c-m);best=c}return best}
+
+/* ---------- note detection (Notes mode + MIDI) ---------- */
+function detectNotes(){
+  const set=scaleSet(),q=new Int16Array(an.F),raw=[];
+  for(let i=0;i<an.F;i++)q[i]=an.v[i]?snap(an.midi[i],set):-1;
+  let i=0;
+  while(i<an.F){if(q[i]<0){i++;continue}let j=i;const ph=[];
+    while(j<an.F&&q[j]>=0){let k=j;while(k<an.F&&q[k]===q[j])k++;ph.push({p:q[j],s:j,e:k});j=k}
+    for(;;){let sh=-1;for(let n=0;n<ph.length;n++)if(ph[n].e-ph[n].s<10&&(sh<0||ph[n].e-ph[n].s<ph[sh].e-ph[sh].s))sh=n;
+      if(sh<0||ph.length===1)break;const L=ph[sh-1],R=ph[sh+1],x=ph[sh];
+      const tgt=!L?R:!R?L:(Math.abs(L.p-x.p)<=Math.abs(R.p-x.p)?L:R);
+      tgt.s=Math.min(tgt.s,x.s);tgt.e=Math.max(tgt.e,x.e);ph.splice(sh,1);
+      for(let n=ph.length-1;n>0;n--)if(ph[n].p===ph[n-1].p){ph[n-1].e=ph[n].e;ph.splice(n,1)}}
+    for(const n of ph){let a=0;for(let f=n.s;f<n.e;f++)a+=an.amp[f];raw.push({p:n.p,s:n.s*FT+WIN/2/AR,e:n.e*FT+WIN/2/AR,vel:Math.max(40,Math.min(127,Math.round(a/(n.e-n.s)*127)))})}
+    i=j}
+  const qd=+$('quant').value;if(!qd)return raw;
+  const g=60/bpm()/(qd/4),res=[];
+  for(const n of raw){const s=Math.round(n.s/g)*g,e=Math.max(s+g,Math.round(n.e/g)*g);res.push({...n,s,e})}
+  for(let k=res.length-1;k>0;k--){if(res[k].s<=res[k-1].s){res.splice(k-1,1);continue}if(res[k-1].e>res[k].s)res[k-1].e=res[k].s}
+  return res;
+}
+const bpm=()=>Math.min(200,Math.max(60,+$('bpm').value||140));
+
+/* ---------- synth: kazoo + growl + distortion + wobble ---------- */
+function biq(f,Q){const w=2*Math.PI*f/SR,al=Math.sin(w)/(2*Q),a0=1+al;return{b0:al/a0,b2:-al/a0,a1:-2*Math.cos(w)/a0,a2:(1-al)/a0,x1:0,x2:0,y1:0,y2:0}}
+function bp(b,x){const y=b.b0*x+b.b2*b.x2-b.a1*b.y1-b.a2*b.y2;b.x2=b.x1;b.x1=x;b.y2=b.y1;b.y1=y;return y}
+const blep=(t,dt)=>t<dt?(t/=dt,t+t-t*t-1):t>1-dt?(t=(t-1)/dt,t*t+t+t+1):0;
+function render(){
+  const mode=document.querySelector('#mode [aria-pressed=true]').dataset.v,oct=+$('oct').value,set=scaleSet();
+  const P=k=>+$(k).value/100,growl=P('growl'),drive=P('drive'),buzz=P('buzz'),depth=P('depth'),reso=P('reso');
+  const B=bpm(),cyc=+$('rate').value;
+  notes=detectNotes();
+  const len=Math.ceil((an.F*FT+0.6)*SR),pt=new Float32Array(len),gt=new Float32Array(len);
+  if(mode==='notes'){
+    let last=notes[0]?notes[0].p:60;pt.fill(last);
+    for(const n of notes){const a=Math.floor(n.s*SR),b=Math.min(len,Math.floor(n.e*SR));for(let i=a;i<b;i++){pt[i]=n.p;gt[i]=0.55+0.45*n.vel/127}
+      for(let i=b;i<len;i++)pt[i]=n.p}
+  }else{
+    let lastM=60;for(let f=0;f<an.F;f++)if(an.v[f]){lastM=an.midi[f];break}
+    const fm=new Float32Array(an.F);for(let f=0;f<an.F;f++){if(an.v[f])lastM=mode==='snap'?snap(an.midi[f],set):an.midi[f];fm[f]=lastM}
+    const off=WIN/2/AR;
+    for(let i=0;i<len;i++){const p=(i/SR-off)/FT,j=Math.max(0,Math.min(an.F-1,Math.floor(p))),k=Math.min(an.F-1,j+1),fr=Math.max(0,Math.min(1,p-j));
+      pt[i]=fm[j]*(1-fr)+fm[k]*fr;gt[i]=an.amp[j]*(1-fr)+an.amp[k]*fr}
+  }
+  const o=new Float32Array(len),f1=biq(520,4),f2=biq(1450,5),f3=biq(2900,6);
+  const glide=1-Math.exp(-1/(SR*(mode==='follow'?0.004:0.02))),atk=1-Math.exp(-1/(SR*0.005)),rel=1-Math.exp(-1/(SR*0.06));
+  const g=1+drive*10,tg=Math.tanh(g),k=2-1.88*reso;
+  let ph=0,m=pt[0],env=0,ic1=0,ic2=0,peak=0;
+  for(let i=0;i<len;i++){
+    m+=(pt[i]+oct-m)*glide;
+    const dt=440*Math.pow(2,(m-69)/12)/SR;ph+=dt;if(ph>=1)ph-=1;
+    const saw=2*ph-1-blep(ph,dt);
+    let pul=ph<0.35?1:-1;pul+=blep(ph,dt);pul-=blep((ph+0.65)%1,dt);
+    const lfo=0.5-0.5*Math.cos(2*Math.PI*(i/SR*B/60/cyc));
+    const I=growl*(1.2+5*lfo),fmv=Math.sin(2*Math.PI*ph+I*Math.sin(2*Math.PI*ph));
+    let x=(1-growl*0.7)*(0.55*saw+0.45*pul)+growl*0.9*fmv;
+    x=Math.tanh(x*g)/tg;
+    const fz=bp(f1,x)*1.2+bp(f2,x)+bp(f3,x)*0.7;
+    x=x*(1-buzz*0.55)+buzz*fz*2.4;
+    if(x<0)x*=1-0.45*buzz;
+    x+=(Math.random()*2-1)*buzz*0.06*env;
+    const lf=(1-depth)*Math.log(3800)+depth*(Math.log(90)+6.2*Math.LN2*lfo),fc=Math.min(SR*0.45,Math.exp(lf));
+    const gg=Math.tan(Math.PI*fc/SR),v1=(ic1+gg*(x-ic2))/(1+gg*(gg+k)),v2=ic2+gg*v1;ic1=2*v1-ic1;ic2=2*v2-ic2;
+    const y=v2+0.3*reso*v1;
+    env+=(gt[i]-env)*(gt[i]>env?atk:rel);
+    const s=Math.tanh(y*env*1.6);o[i]=s;const a=s<0?-s:s;if(a>peak)peak=a;
+  }
+  if(peak>0){const n=0.89/peak;for(let i=0;i<len;i++)o[i]*=n}
+  out=o;return o;
+}
+
+/* ---------- drawing ---------- */
+const cv=$('cv');
+function draw(head){
+  const W=cv.clientWidth,H=cv.clientHeight,dpr=devicePixelRatio||1;
+  if(cv.width!==Math.round(W*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr)}
+  const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.fillStyle='#0e0f12';c.fillRect(0,0,W,H);
+  if(!an)return;
+  const oct=+$('oct').value,mode=document.querySelector('#mode [aria-pressed=true]').dataset.v,set=scaleSet();
+  let lo=1e9,hi=-1e9;for(let f=0;f<an.F;f++)if(an.v[f]){lo=Math.min(lo,an.midi[f],an.midi[f]+oct);hi=Math.max(hi,an.midi[f],an.midi[f]+oct)}
+  if(lo>hi){lo=48;hi=72}lo=Math.floor(lo)-2;hi=Math.ceil(hi)+2;
+  const strip=W<520?26:36,ph=H-strip-6,dur=an.F*FT+0.6,X=t=>t/dur*W,Y=m=>ph-(m-lo)/(hi-lo)*ph,row=ph/(hi-lo);
+  for(let m=lo;m<hi;m++){const pc=((m%12)+12)%12;c.fillStyle=set.has(pc)?'#171a20':'#111216';c.fillRect(0,Y(m+0.5),W,row);
+    if(pc===0&&row>7&&W>=520){c.fillStyle='#6c6a66';c.font='11px Rubik';c.fillText('C'+(Math.floor(m/12)-1),4,Y(m)+4)}}
+  const beat=60/bpm();c.strokeStyle='#1f222a';c.lineWidth=1;
+  for(let t=0,b=0;t<dur;t+=beat,b++){c.globalAlpha=b%4?0.6:1;c.strokeStyle=b%4?'#1c1f26':'#2b2f39';c.beginPath();c.moveTo(X(t)+.5,0);c.lineTo(X(t)+.5,ph);c.stroke()}
+  c.globalAlpha=1;
+  c.strokeStyle='#8d8a85';c.lineWidth=1.5;c.beginPath();let pen=false;
+  for(let f=0;f<an.F;f++){const t=f*FT+WIN/2/AR;if(an.v[f]){const y=Y(an.midi[f]);pen?c.lineTo(X(t),y):c.moveTo(X(t),y);pen=true}else pen=false}
+  c.stroke();
+  c.fillStyle='#ff5a1f';
+  if(mode==='notes'||mode==='snap'){for(const n of (mode==='notes'?notes:snapRuns()))c.fillRect(X(n.s),Y(n.p+oct+0.4),Math.max(2,X(n.e)-X(n.s)-1),Math.max(3,row*0.8))}
+  else{c.strokeStyle='#ff5a1f';c.lineWidth=3;c.beginPath();pen=false;
+    for(let f=0;f<an.F;f++){const t=f*FT+WIN/2/AR;if(an.v[f]){const y=Y(an.midi[f]+oct);pen?c.lineTo(X(t),y):c.moveTo(X(t),y);pen=true}else pen=false}c.stroke()}
+  const cyc=+$('rate').value,y0=H-strip;c.fillStyle='#15171c';c.fillRect(0,y0,W,strip);
+  c.strokeStyle='#ffd23f';c.lineWidth=2;c.beginPath();
+  for(let px=0;px<=W;px+=2){const t=px/W*dur,l=0.5-0.5*Math.cos(2*Math.PI*t/beat/cyc),y=y0+strip-3-l*(strip-8)*(+$('depth').value/100);px?c.lineTo(px,y):c.moveTo(px,y)}c.stroke();
+  if(W>=420){c.fillStyle='#15171c';c.fillRect(W-58,y0+1,56,15);c.fillStyle='#ffd23f';c.font='11px Rubik';c.fillText('wobble',W-50,y0+12)}
+  if(head!=null){c.fillStyle='#fff';c.fillRect(X(head),0,2,H)}
+}
+function snapRuns(){const set=scaleSet(),r=[];let cur=null;
+  for(let f=0;f<an.F;f++){const t=f*FT+WIN/2/AR;if(!an.v[f]){cur=null;continue}const p=snap(an.midi[f],set);
+    if(cur&&cur.p===p)cur.e=t+FT;else{cur={p,s:t,e:t+FT};r.push(cur)}}return r}
+const ro=new ResizeObserver(()=>draw());ro.observe(cv);
+
+/* ---------- audio I/O ---------- */
+function stop(){if(src){try{src.onended=null;src.stop()}catch(e){}src=null}playing=null;cancelAnimationFrame(raf);draw();
+  $('playHum').textContent='▶ My hum';$('playWub').textContent='▶ Wubzoo'}
+function play(which){
+  const was=playing;stop();if(was===which)return;
+  const a=ctx();a.resume();const data=which==='hum'?hum:out;if(!data)return;
+  const b=a.createBuffer(1,data.length,SR);b.getChannelData(0).set(data);
+  src=a.createBufferSource();src.buffer=b;src.loop=$('loop').checked;src.connect(a.destination);src.start();t0=a.currentTime;playing=which;
+  src.onended=()=>{if(!src||!src.loop)stop()};
+  $(which==='hum'?'playHum':'playWub').textContent='■ Stop';
+  const tick=()=>{if(!playing)return;const t=(a.currentTime-t0)%(data.length/SR);draw(t);raf=requestAnimationFrame(tick)};tick();
+}
+function loadHum(x){
+  if(x.length<SR*0.3){st('That take is too short — hum for at least a second.');return}
+  hum=x.length>SR*90?x.slice(0,SR*90):x;stop();st('Listening to your hum…');
+  setTimeout(()=>{const T=performance.now();an=analyze(hum);
+    const voiced=an.v.reduce((s,q)=>s+q,0);
+    if(voiced<10){st('Couldn’t hear a clear pitch. Hum louder and closer to the mic.');an=null;draw();return}
+    render();$('empty').hidden=true;['playHum','playWub','saveWav','saveMid'].forEach(i=>$(i).disabled=false);
+    draw();st(`Got it: ${(hum.length/SR).toFixed(1)} s of hum, ${notes.length} notes detected. Hit ▶ Wubzoo.`);
+  },30);
+}
+function resample(buf){const ch=buf.numberOfChannels,n=buf.length,x=new Float32Array(n);
+  for(let c=0;c<ch;c++){const d=buf.getChannelData(c);for(let i=0;i<n;i++)x[i]+=d[i]/ch}
+  if(buf.sampleRate===SR)return x;const m=Math.floor(n*SR/buf.sampleRate),y=new Float32Array(m),k=buf.sampleRate/SR;
+  for(let i=0;i<m;i++){const p=i*k,j=p|0,f=p-j;y[i]=x[j]*(1-f)+(x[j+1]||0)*f}return y}
+$('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;st('Loading '+f.name+'…');
+  try{const b=await ctx().decodeAudioData(await f.arrayBuffer());loadHum(resample(b))}catch(err){st('Couldn’t read that file. Try a WAV, MP3 or M4A voice memo.')}e.target.value=''};
+$('rec').onclick=async()=>{
+  if(recState){const {stream,proc,chunks,sr}=recState;proc.disconnect();stream.getTracks().forEach(t=>t.stop());recState=null;
+    $('rec').classList.remove('on');$('rec').textContent='● Record';
+    let n=0;chunks.forEach(c=>n+=c.length);const x=new Float32Array(n);let o=0;chunks.forEach(c=>{x.set(c,o);o+=c.length});
+    const b=ctx().createBuffer(1,n||1,sr);b.getChannelData(0).set(x);loadHum(resample(b));return}
+  stop();
+  try{const a=ctx();await a.resume();
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    const s=a.createMediaStreamSource(stream),proc=a.createScriptProcessor(4096,1,1),chunks=[],z=a.createGain();z.gain.value=0;
+    proc.onaudioprocess=e=>{chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));const secs=chunks.length*4096/a.sampleRate;st(`Recording… ${secs.toFixed(1)} s — hum away, then press Stop.`);if(secs>60)$('rec').click()};
+    s.connect(proc);proc.connect(z);z.connect(a.destination);
+    recState={stream,proc,chunks,sr:a.sampleRate};$('rec').classList.add('on');$('rec').textContent='■ Stop';
+  }catch(err){if(window.WubzooAndroid){st('Wubzoo can’t use the mic. Allow Microphone for Wubzoo in your phone’s Settings → Apps, then try again.');return}st('The mic is blocked here. Upload a voice memo of your hum instead, or open the Wubzoo HTML file in Chrome on your PC to record live.')}
+};
+$('demo').onclick=()=>{ // a hummed riff in F minor with vibrato and slides
+  const mel=[[53,.45],[56,.3],[60,.6],[58,.3],[56,.3],[55,.45],[53,.9],[-1,.25],[53,.3],[60,.3],[63,.6],[61,.3],[60,.3],[56,.6],[58,1]];
+  let total=mel.reduce((s,q)=>s+q[1],0)+0.4;const n=Math.floor(total*SR),x=new Float32Array(n);let i0=Math.floor(0.2*SR),ph=0,prev=53;
+  for(const [m,d] of mel){const len=Math.floor(d*SR);if(m<0){i0+=len;continue}
+    for(let i=0;i<len&&i0+i<n;i++){const t=i/SR,sl=Math.min(1,t/0.05),mm=prev+(m-prev)*sl+0.25*Math.sin(2*Math.PI*5.5*t)*Math.min(1,t/0.2);
+      ph+=440*Math.pow(2,(mm-69)/12)/SR;const env=Math.min(1,t/0.03)*Math.min(1,(d-t)/0.06);
+      x[i0+i]=env*0.3*(Math.sin(2*Math.PI*ph)+0.5*Math.sin(4*Math.PI*ph)+0.25*Math.sin(6*Math.PI*ph))+(Math.random()-0.5)*0.004}
+    i0+=len;prev=m}
+  loadHum(x)};
+$('playHum').onclick=()=>play('hum');$('playWub').onclick=()=>play('wub');
+$('loop').onchange=()=>{if(src)src.loop=$('loop').checked};
+
+/* ---------- controls ---------- */
+const NOTE={follow:'Follows every slide and wiggle in your hum, like a real kazoo.',snap:'Your hum glides between notes, but each lands right on the key.',notes:'Turns your hum into clean notes, quantized to the grid.'};
+let tmr=0;const rerender=()=>{clearTimeout(tmr);tmr=setTimeout(()=>{if(!an){draw();return}const was=playing;stop();render();draw();if(was)play(was)},140)};
+function setMode(v){document.querySelectorAll('#mode button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));$('modeNote').textContent=NOTE[v]+(v==='notes'?'':' Quantize applies to Notes and the MIDI file.')}
+$('mode').onclick=e=>{const b=e.target.closest('button');if(b){setMode(b.dataset.v);rerender()}};
+document.querySelectorAll('input[type=range]').forEach(r=>{const o=r.parentNode.querySelector('output');const u=()=>o.textContent=r.value;u();r.addEventListener('input',()=>{u();rerender()})});
+['key','scale','quant','oct','bpm','rate'].forEach(i=>$(i).addEventListener('change',rerender));
+const PRE={wub:{growl:40,drive:40,buzz:45,depth:85,reso:60,rate:'0.5'},filth:{growl:90,drive:80,buzz:40,depth:75,reso:70,rate:'0.25'},kazoo:{growl:10,drive:20,buzz:95,depth:15,reso:30,rate:'1'},yoi:{growl:60,drive:55,buzz:80,depth:95,reso:92,rate:'0.3333'}};
+$('presets').onclick=e=>{const b=e.target.closest('button');if(!b)return;const p=PRE[b.dataset.p];
+  for(const k in p){$(k).value=p[k];const o=$(k).parentNode.querySelector('output');if(o)o.textContent=p[k]}rerender()};
+setMode('snap');
+
+/* ---------- export ---------- */
+function wav(x){const n=x.length,b=new DataView(new ArrayBuffer(44+n*2));const w=(o,s)=>{for(let i=0;i<s.length;i++)b.setUint8(o+i,s.charCodeAt(i))};
+  w(0,'RIFF');b.setUint32(4,36+n*2,true);w(8,'WAVEfmt ');b.setUint32(16,16,true);b.setUint16(20,1,true);b.setUint16(22,1,true);b.setUint32(24,SR,true);b.setUint32(28,SR*2,true);b.setUint16(32,2,true);b.setUint16(34,16,true);w(36,'data');b.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++)b.setInt16(44+i*2,Math.max(-1,Math.min(1,x[i]))*32767,true);return new Uint8Array(b.buffer)}
+function midiFile(){const B=bpm(),PPQ=480,tk=s=>Math.round(s*B/60*PPQ),oct=+$('oct').value,ev=[];
+  for(const n of notes){const p=Math.max(0,Math.min(127,n.p+oct));ev.push([tk(n.s),1,[0x90,p,n.vel]]);ev.push([tk(n.e),0,[0x80,p,0]])}
+  ev.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  const vl=v=>{const r=[v&127];while(v>>=7)r.unshift((v&127)|128);return r};
+  const us=Math.round(6e7/B),name=[...'Wubzoo'].map(c=>c.charCodeAt(0));
+  let tr=[0,0xFF,0x51,3,(us>>16)&255,(us>>8)&255,us&255,0,0xFF,0x03,name.length,...name,0,0xC0,81],last=0;
+  for(const [t,,d] of ev){tr.push(...vl(t-last),...d);last=t}tr.push(0,0xFF,0x2F,0);
+  const h=[77,84,104,100,0,0,0,6,0,0,0,1,PPQ>>8,PPQ&255,77,84,114,107,(tr.length>>>24)&255,(tr.length>>16)&255,(tr.length>>8)&255,tr.length&255];
+  return new Uint8Array([...h,...tr])}
+async function save(name,bytes,type){
+  const stamp=new Date().toISOString().slice(0,19).replace(/[-:T]/g,'').replace(/^(\d{8})/,'$1-');name=name.replace('.','-'+stamp+'.');
+  if(window.WubzooAndroid){let s='';for(let i=0;i<bytes.length;i+=8192)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));
+    st(window.WubzooAndroid.save(name,btoa(s),type)==='ok'?'Saved to Downloads/Wubzoo/'+name:'Couldn’t save the file.');return}
+  if(dl){try{await dl.save({filename:name,data:new Blob([bytes],{type})});st('Saved '+name+'.');return}catch(e){try{await dl.save({filename:name,data:bytes});st('Saved '+name+'.');return}catch(e2){st('Save was cancelled or blocked.');return}}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([bytes],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();st('Saved '+name+'.')}
+$('saveWav').onclick=()=>out&&save('wubzoo.wav',wav(out),'audio/wav');
+$('saveMid').onclick=()=>notes.length?save('wubzoo.mid',midiFile(),'audio/midi'):st('No notes detected to export.');
+if(window.claude&&window.claude.use)window.claude.use('downloads').then(d=>{dl=d}).catch(()=>{});
+draw();
+window.__wz={analyze,render,detectNotes,loadHum,get an(){return an},get out(){return out},get notes(){return notes},wav};
+}
+</script>
+</body>
+</html>
